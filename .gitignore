@@ -1,0 +1,51 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.project
+.settings/
+.vscode/
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+
+# Android
+.gradle/
+local.properties
+**/flutter_assets_metadata_*.txt
+*.apk
+*.ap_
+*.aab
+
+# iOS/macOS
+iOS/.symlinks/
+iOS/Pods/
+iOS/Podfile.lock
+.xcode/
+derivedData/
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+
+# Web
+.target/
+
+# Windows
+/windows/flutter/ephemeral/
+Generated.xcconfig
+flutter_export_environment.sh
+
+# Linux
+/linux/flutter/ephemeral/
