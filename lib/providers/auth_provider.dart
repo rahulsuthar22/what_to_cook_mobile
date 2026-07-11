@@ -4,6 +4,13 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/user.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
+enum SessionVerificationResult {
+  valid,
+  invalid,
+  networkError,
+}
 
 class AuthProvider extends ChangeNotifier {
   final Dio _dio = Dio();
@@ -49,12 +56,16 @@ class AuthProvider extends ChangeNotifier {
       _sessionCookie = prefs.getString('session_cookie');
       final userJson = prefs.getString('user_profile');
 
-      if (_sessionCookie != null && userJson != null) {
-        _user = UserModel.fromJson(jsonDecode(userJson));
+      if (_sessionCookie != null) {
+        if (userJson != null) {
+          _user = UserModel.fromJson(jsonDecode(userJson));
+          // Immediately notify to log the user in locally without blocking on backend ping
+          notifyListeners();
+        }
         
-        // Validate session with backend
-        final valid = await verifySession();
-        if (!valid) {
+        // Validate session with backend in background (fetches user profile if not cached)
+        final result = await verifySession();
+        if (result == SessionVerificationResult.invalid) {
           await logout();
         }
       }
@@ -66,25 +77,50 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> verifySession() async {
+  Future<SessionVerificationResult> verifySession() async {
     try {
       final res = await _dio.get(ApiConfig.sessionEndpoint);
-      if (res.statusCode == 200 && res.data != null && res.data['user'] != null) {
-        // Re-sync profile to ensure fresh database values
-        final email = res.data['user']['email'];
-        await fetchAndSyncProfile(email, res.data['user']['name'] ?? email.split('@')[0]);
-        return true;
+      if (res.statusCode == 200) {
+        if (res.data != null && res.data['user'] != null) {
+          final email = res.data['user']['email'];
+          final userId = res.data['user']['id'];
+          await fetchAndSyncProfile(email, res.data['user']['name'] ?? email.split('@')[0], userId: userId);
+          return SessionVerificationResult.valid;
+        } else {
+          return SessionVerificationResult.invalid;
+        }
       }
-      return false;
+      if (res.statusCode == 401 || res.statusCode == 403) {
+        return SessionVerificationResult.invalid;
+      }
+      return SessionVerificationResult.networkError;
+    } on DioException catch (e) {
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        if (statusCode == 401 || statusCode == 403) {
+          return SessionVerificationResult.invalid;
+        }
+      }
+      return SessionVerificationResult.networkError;
     } catch (e) {
-      return false;
+      return SessionVerificationResult.networkError;
     }
   }
 
-  Future<void> fetchAndSyncProfile(String email, String name) async {
+  Future<void> fetchAndSyncProfile(String email, String name, {String? userId}) async {
     try {
+      String targetUid = userId ?? email.hashCode.toString();
+      if (userId == null) {
+        try {
+          final sessionRes = await _dio.get(ApiConfig.sessionEndpoint);
+          if (sessionRes.statusCode == 200 && sessionRes.data != null && sessionRes.data['user'] != null) {
+            targetUid = sessionRes.data['user']['id'] ?? targetUid;
+          }
+        } catch (_) {}
+      }
+
       final res = await _dio.post(ApiConfig.syncEndpoint, data: {
-        'user_id': email.hashCode.toString(), // Consistent hash-based ID matching route.ts authorization
+        'user_id': targetUid,
         'full_name': name,
         'email': email,
       });
@@ -114,10 +150,7 @@ class AuthProvider extends ChangeNotifier {
       final csrfCookies = csrfRes.headers['set-cookie'];
       String? csrfCookieHeader;
       if (csrfCookies != null && csrfCookies.isNotEmpty) {
-        csrfCookieHeader = csrfCookies.firstWhere(
-          (c) => c.contains('next-auth.csrf-token') || c.contains('__Secure-next-auth.csrf-token'),
-          orElse: () => '',
-        );
+        csrfCookieHeader = csrfCookies.map((c) => c.split(';').first).join('; ');
       }
 
       // 2. Perform Credentials SignIn
@@ -133,7 +166,7 @@ class AuthProvider extends ChangeNotifier {
           contentType: Headers.formUrlEncodedContentType,
           validateStatus: (status) => (status ?? 500) < 500,
           headers: csrfCookieHeader != null && csrfCookieHeader.isNotEmpty
-              ? {'Cookie': csrfCookieHeader.split(';').first}
+              ? {'Cookie': csrfCookieHeader}
               : null,
         ),
       );
@@ -146,22 +179,28 @@ class AuthProvider extends ChangeNotifier {
       // 3. Extract Session Cookie
       final cookies = res.headers['set-cookie'];
       if (cookies != null && cookies.isNotEmpty) {
-        // Extract next-auth.session-token
-        final sessionCookie = cookies.firstWhere(
+        final sessionCookies = cookies.where(
           (c) => c.contains('next-auth.session-token') || c.contains('__Secure-next-auth.session-token'),
-          orElse: () => '',
         );
 
-        if (sessionCookie.isNotEmpty) {
-          // Clean cookie string to extract just the token part
-          final cleanCookie = sessionCookie.split(';').first;
+        if (sessionCookies.isNotEmpty) {
+          final cleanCookie = sessionCookies.map((c) => c.split(';').first).join('; ');
           _sessionCookie = cleanCookie;
           
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('session_cookie', cleanCookie);
 
+          // Get fresh session details to resolve proper UUID
+          final sessionRes = await _dio.get(ApiConfig.sessionEndpoint);
+          String? trueUserId;
+          String trueName = email.split('@')[0];
+          if (sessionRes.statusCode == 200 && sessionRes.data != null && sessionRes.data['user'] != null) {
+            trueUserId = sessionRes.data['user']['id'];
+            trueName = sessionRes.data['user']['name'] ?? trueName;
+          }
+
           // 4. Sync profile with database
-          await fetchAndSyncProfile(email, email.split('@')[0]);
+          await fetchAndSyncProfile(email, trueName, userId: trueUserId);
           
           _isLoading = false;
           notifyListeners();
@@ -200,10 +239,7 @@ class AuthProvider extends ChangeNotifier {
       final csrfCookies = csrfRes.headers['set-cookie'];
       String? csrfCookieHeader;
       if (csrfCookies != null && csrfCookies.isNotEmpty) {
-        csrfCookieHeader = csrfCookies.firstWhere(
-          (c) => c.contains('next-auth.csrf-token') || c.contains('__Secure-next-auth.csrf-token'),
-          orElse: () => '',
-        );
+        csrfCookieHeader = csrfCookies.map((c) => c.split(';').first).join('; ');
       }
 
       // Post registration parameters directly to NextAuth credentials logic
@@ -223,7 +259,7 @@ class AuthProvider extends ChangeNotifier {
           contentType: Headers.formUrlEncodedContentType,
           validateStatus: (status) => (status ?? 500) < 500,
           headers: csrfCookieHeader != null && csrfCookieHeader.isNotEmpty
-              ? {'Cookie': csrfCookieHeader.split(';').first}
+              ? {'Cookie': csrfCookieHeader}
               : null,
         ),
       );
@@ -234,20 +270,28 @@ class AuthProvider extends ChangeNotifier {
 
       final cookies = res.headers['set-cookie'];
       if (cookies != null && cookies.isNotEmpty) {
-        final sessionCookie = cookies.firstWhere(
+        final sessionCookies = cookies.where(
           (c) => c.contains('next-auth.session-token') || c.contains('__Secure-next-auth.session-token'),
-          orElse: () => '',
         );
 
-        if (sessionCookie.isNotEmpty) {
-          final cleanCookie = sessionCookie.split(';').first;
+        if (sessionCookies.isNotEmpty) {
+          final cleanCookie = sessionCookies.map((c) => c.split(';').first).join('; ');
           _sessionCookie = cleanCookie;
           
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('session_cookie', cleanCookie);
 
+          // Get fresh session details to resolve proper UUID
+          final sessionRes = await _dio.get(ApiConfig.sessionEndpoint);
+          String? trueUserId;
+          String trueName = name;
+          if (sessionRes.statusCode == 200 && sessionRes.data != null && sessionRes.data['user'] != null) {
+            trueUserId = sessionRes.data['user']['id'];
+            trueName = sessionRes.data['user']['name'] ?? trueName;
+          }
+
           // Sync database details
-          await fetchAndSyncProfile(email, name);
+          await fetchAndSyncProfile(email, trueName, userId: trueUserId);
           
           _isLoading = false;
           notifyListeners();
@@ -255,6 +299,120 @@ class AuthProvider extends ChangeNotifier {
         }
       }
       throw Exception('Registration succeeded but session could not be established');
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return {'success': false, 'error': e.toString().replaceFirst('Exception: ', '')};
+    }
+  }
+
+  Future<Map<String, dynamic>> loginWithGoogle(String email, String name) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final googleUserId = 'google_${email.split('@')[0]}_${email.hashCode.abs()}';
+      _sessionCookie = 'next-auth.session-token=mock-google-${email.hashCode.abs()}';
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('session_cookie', _sessionCookie!);
+
+      await fetchAndSyncProfile(email, name, userId: googleUserId);
+
+      _isLoading = false;
+      notifyListeners();
+      return {'success': true};
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> loginWithGoogleCookie(String sessionCookie) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      _sessionCookie = sessionCookie;
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('session_cookie', sessionCookie);
+
+      // Verify and sync session using next-auth/session endpoint
+      final result = await verifySession();
+      if (result != SessionVerificationResult.valid) {
+        throw Exception('Failed to verify the Google session cookie on the backend');
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return {'success': true};
+    } catch (e) {
+      await logout();
+      _isLoading = false;
+      notifyListeners();
+      return {'success': false, 'error': e.toString().replaceFirst('Exception: ', '')};
+    }
+  }
+
+  Future<Map<String, dynamic>> loginWithGoogleNative() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+        serverClientId: '1009721326330-jfibeb82fn0sf9iro4rbnmb0eunfu718.apps.googleusercontent.com',
+      );
+      
+      // Force showing account selection dialog by clearing local cache
+      try {
+        await googleSignIn.signOut();
+      } catch (_) {}
+      
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        _isLoading = false;
+        notifyListeners();
+        return {'success': false, 'error': 'Sign-in cancelled'};
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        throw Exception('Failed to retrieve ID Token from Google');
+      }
+
+      // Send ID Token to our backend
+      final res = await _dio.post(
+        '/api/auth/google-native',
+        data: {'idToken': idToken},
+      );
+
+      if (res.statusCode == 200 && res.data['success'] == true) {
+        final sessionToken = res.data['sessionToken'] as String;
+        final cookieStr = 'next-auth.session-token=$sessionToken';
+        
+        _sessionCookie = cookieStr;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('session_cookie', cookieStr);
+
+        final userData = res.data['user'];
+        _user = UserModel.fromJson(userData);
+        await prefs.setString('user_profile', jsonEncode(_user!.toJson()));
+
+        // Clean up GoogleSignIn session locally so they can select account again next time
+        await googleSignIn.signOut();
+
+        _isLoading = false;
+        notifyListeners();
+        return {'success': true};
+      } else {
+        throw Exception(res.data['error'] ?? 'Authentication failed');
+      }
     } catch (e) {
       _isLoading = false;
       notifyListeners();

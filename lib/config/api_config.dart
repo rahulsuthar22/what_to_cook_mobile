@@ -1,6 +1,6 @@
 class ApiConfig {
   // Replace this with your production Vercel/Netlify URL, or use the local emulator fallback
-  static const String baseUrl = 'http://10.92.43.46:3000'; // Default to Android Emulator local host
+  static const String baseUrl = 'http://10.229.49.46:3000'; // Default to Android Emulator local host
   
   // API Endpoints
   static const String loginEndpoint = '/api/auth/callback/credentials';

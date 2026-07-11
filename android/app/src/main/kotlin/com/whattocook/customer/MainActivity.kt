@@ -1,4 +1,4 @@
-package com.whattocook.frontend_mobile
+package com.whattocook.customer
 
 import io.flutter.embedding.android.FlutterActivity
 

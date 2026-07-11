@@ -23,16 +23,24 @@ class PlannerProvider extends ChangeNotifier {
   void updateSession(String? cookie) {
     if (cookie != null) {
       _dio.options.headers['Cookie'] = cookie;
+    } else {
+      _dio.options.headers.remove('Cookie');
     }
   }
 
   Future<void> fetchMealPlans() async {
+    final uid = authProvider.user?.uid;
+    if (uid == null) return;
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final res = await _dio.get(ApiConfig.plannerEndpoint);
+      final res = await _dio.get(
+        ApiConfig.plannerEndpoint,
+        queryParameters: {'user_id': uid},
+      );
       if (res.statusCode == 200 && res.data['success'] == true) {
         var list = res.data['mealPlans'] as List;
         _mealPlans = list.map((m) => MealPlanModel.fromJson(m)).toList();
@@ -50,6 +58,9 @@ class PlannerProvider extends ChangeNotifier {
     required String date,
     required String mealType,
   }) async {
+    final uid = authProvider.user?.uid;
+    if (uid == null) return false;
+
     _isLoading = true;
     notifyListeners();
 
@@ -57,8 +68,9 @@ class PlannerProvider extends ChangeNotifier {
       final res = await _dio.post(
         ApiConfig.plannerEndpoint,
         data: {
+          'user_id': uid,
           'recipe_id': recipeId,
-          'date': date,
+          'meal_date': date,
           'meal_type': mealType,
         },
       );
@@ -83,8 +95,8 @@ class PlannerProvider extends ChangeNotifier {
     try {
       final res = await _dio.delete(
         ApiConfig.plannerEndpoint,
-        data: {
-          'plan_id': planId,
+        queryParameters: {
+          'meal_plan_id': planId.toString(),
         },
       );
 

@@ -19,6 +19,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   
   String _dietaryPreference = 'None';
   String? _errorMessage;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -233,15 +234,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Password input
+                // Password input with visibility toggle
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
+                  obscureText: _obscurePassword,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Password',
                     hintStyle: const TextStyle(color: Colors.white38),
                     prefixIcon: const Icon(Icons.lock_outline, color: Colors.white60),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        color: Colors.white38,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
                     filled: true,
                     fillColor: surfaceColor,
                     border: OutlineInputBorder(
@@ -284,6 +297,97 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         ),
                 ),
+                const SizedBox(height: 16),
+                const Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.white10)),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'or',
+                        style: TextStyle(color: Colors.white30, fontSize: 13),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: Colors.white10)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  onPressed: authProvider.isLoading
+                      ? null
+                      : () async {
+                          final navigator = Navigator.of(context);
+                          setState(() {
+                            _errorMessage = null;
+                          });
+                          final res = await authProvider.loginWithGoogleNative();
+                          if (mounted) {
+                            if (res['success'] == true) {
+                              navigator.pushAndRemoveUntil(
+                                MaterialPageRoute(builder: (_) => const PortalNavigation()),
+                                (route) => false,
+                              );
+                            } else {
+                              setState(() {
+                                _errorMessage = res['error'] ?? 'Google authentication failed';
+                              });
+                            }
+                          }
+                        },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white10),
+                    backgroundColor: surfaceColor,
+                    padding: const EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'G ',
+                        style: TextStyle(
+                          color: Colors.blueAccent,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'Sign Up with Google',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Direct link to login
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      "Already have an account? ",
+                      style: TextStyle(color: Colors.white60),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: Text(
+                        'Sign In',
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -291,4 +395,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
+
+
 }

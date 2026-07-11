@@ -23,16 +23,24 @@ class GroceryProvider extends ChangeNotifier {
   void updateSession(String? cookie) {
     if (cookie != null) {
       _dio.options.headers['Cookie'] = cookie;
+    } else {
+      _dio.options.headers.remove('Cookie');
     }
   }
 
   Future<void> fetchGroceryItems() async {
+    final uid = authProvider.user?.uid;
+    if (uid == null) return;
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final res = await _dio.get(ApiConfig.groceryEndpoint);
+      final res = await _dio.get(
+        ApiConfig.groceryEndpoint,
+        queryParameters: {'user_id': uid},
+      );
       if (res.statusCode == 200 && res.data['success'] == true) {
         var list = res.data['groceryList'] as List;
         _groceryItems = list.map((g) => GroceryItemModel.fromJson(g)).toList();
@@ -46,6 +54,9 @@ class GroceryProvider extends ChangeNotifier {
   }
 
   Future<bool> generateFromPlanner(String startDate, String endDate) async {
+    final uid = authProvider.user?.uid;
+    if (uid == null) return false;
+
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -54,6 +65,7 @@ class GroceryProvider extends ChangeNotifier {
       final res = await _dio.post(
         ApiConfig.groceryGenerateEndpoint,
         data: {
+          'user_id': uid,
           'start_date': startDate,
           'end_date': endDate,
         },
@@ -75,6 +87,9 @@ class GroceryProvider extends ChangeNotifier {
   }
 
   Future<bool> addCustomItem(String name, String quantity) async {
+    final uid = authProvider.user?.uid;
+    if (uid == null) return false;
+
     _isLoading = true;
     notifyListeners();
 
@@ -82,7 +97,8 @@ class GroceryProvider extends ChangeNotifier {
       final res = await _dio.post(
         ApiConfig.groceryEndpoint,
         data: {
-          'item_name': name,
+          'user_id': uid,
+          'ingredient_name': name,
           'quantity': quantity,
         },
       );
@@ -108,19 +124,20 @@ class GroceryProvider extends ChangeNotifier {
         ApiConfig.groceryEndpoint,
         data: {
           'grocery_id': groceryId,
-          'is_completed': !currentStatus,
+          'status': !currentStatus ? 'Completed' : 'Pending',
         },
       );
 
       if (res.statusCode == 200 && res.data['success'] == true) {
         // Toggle locally immediately for instant UI feedback
         final index = _groceryItems.indexWhere((item) => item.groceryId == groceryId);
-        if (index != -index) {
+        if (index != -1) {
           _groceryItems[index] = GroceryItemModel(
             groceryId: groceryId,
             itemName: _groceryItems[index].itemName,
             quantity: _groceryItems[index].quantity,
             isCompleted: !currentStatus,
+            usedIn: _groceryItems[index].usedIn,
           );
           notifyListeners();
         }
@@ -134,11 +151,20 @@ class GroceryProvider extends ChangeNotifier {
   }
 
   Future<bool> clearAllItems() async {
+    final uid = authProvider.user?.uid;
+    if (uid == null) return false;
+
     _isLoading = true;
     notifyListeners();
 
     try {
-      final res = await _dio.delete(ApiConfig.groceryEndpoint);
+      final res = await _dio.delete(
+        ApiConfig.groceryEndpoint,
+        queryParameters: {
+          'user_id': uid,
+          'clear': 'true',
+        },
+      );
       if (res.statusCode == 200 && res.data['success'] == true) {
         _groceryItems.clear();
         _isLoading = false;

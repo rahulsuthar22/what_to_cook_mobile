@@ -41,6 +41,8 @@ class RecipeProvider extends ChangeNotifier {
   void updateSession(String? cookie) {
     if (cookie != null) {
       _dio.options.headers['Cookie'] = cookie;
+    } else {
+      _dio.options.headers.remove('Cookie');
     }
   }
 
@@ -72,7 +74,8 @@ class RecipeProvider extends ChangeNotifier {
         var list = res.data['recipes'] as List;
         _recipes = list.map((r) => RecipeModel.fromJson(r)).toList();
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Failed to load recipes: $e\n$stack');
       _error = 'Failed to load recipes: $e';
     } finally {
       _isLoading = false;
@@ -104,7 +107,8 @@ class RecipeProvider extends ChangeNotifier {
         var list = res.data['recommendations'] as List;
         _recommendedRecipes = list.map((r) => RecipeModel.fromJson(r)).toList();
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Failed to load recommendations: $e\n$stack');
       _error = 'Failed to load recommendations: $e';
     } finally {
       _isLoading = false;

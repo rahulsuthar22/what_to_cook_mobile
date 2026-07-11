@@ -107,10 +107,20 @@ class _GroceryScreenState extends State<GroceryScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1A),
       appBar: AppBar(
-        title: const Text('Grocery Checklist', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
+        title: const Text(
+          'Grocery Checklist',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        foregroundColor: Colors.white,
+        backgroundColor: surfaceColor,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
+        toolbarHeight: 56,
         actions: [
           if (grocery.groceryItems.isNotEmpty)
             IconButton(
@@ -153,26 +163,66 @@ class _GroceryScreenState extends State<GroceryScreen> {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
                       ),
-                      child: CheckboxListTile(
-                        value: item.isCompleted,
-                        onChanged: (_) => grocery.toggleItemStatus(item.groceryId, item.isCompleted),
-                        activeColor: primaryColor,
-                        checkColor: Colors.white,
-                        title: Text(
-                          item.itemName,
-                          style: TextStyle(
-                            color: item.isCompleted ? Colors.white38 : Colors.white,
-                            decoration: item.isCompleted ? TextDecoration.lineThrough : null,
-                            fontWeight: FontWeight.bold,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CheckboxListTile(
+                            value: item.isCompleted,
+                            onChanged: (_) => grocery.toggleItemStatus(item.groceryId, item.isCompleted),
+                            activeColor: primaryColor,
+                            checkColor: Colors.white,
+                            title: Text(
+                              item.itemName,
+                              style: TextStyle(
+                                color: item.isCompleted ? Colors.white38 : Colors.white,
+                                decoration: item.isCompleted ? TextDecoration.lineThrough : null,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              item.quantity,
+                              style: TextStyle(
+                                color: item.isCompleted ? Colors.white24 : Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
                           ),
-                        ),
-                        subtitle: Text(
-                          item.quantity,
-                          style: TextStyle(
-                            color: item.isCompleted ? Colors.white24 : Colors.white54,
-                            fontSize: 12,
-                          ),
-                        ),
+                          // Recipe association tags
+                          if (item.usedIn.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    'Used in:',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.3),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  ...item.usedIn.map((recipe) => Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: primaryColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      recipe,
+                                      style: TextStyle(
+                                        color: primaryColor,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  )),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     );
                   },

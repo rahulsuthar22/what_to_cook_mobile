@@ -14,11 +14,20 @@ class MealPlanModel {
   });
 
   factory MealPlanModel.fromJson(Map<String, dynamic> json) {
+    final recipeData = json['recipe'] ?? {
+      'recipe_id': json['recipe_id'],
+      'recipe_name': json['recipe_name'],
+      'category': json['category'],
+      'cooking_time': json['cooking_time'],
+      'image_url': json['image_url'],
+      'calories': json['calories'],
+    };
+
     return MealPlanModel(
-      planId: json['plan_id'] ?? json['planId'] ?? 0,
-      date: json['date'] ?? '',
+      planId: json['plan_id'] ?? json['planId'] ?? json['meal_plan_id'] ?? 0,
+      date: json['date'] ?? json['meal_date'] ?? '',
       mealType: json['meal_type'] ?? json['mealType'] ?? 'Lunch',
-      recipe: RecipeModel.fromJson(json['recipe'] ?? {}),
+      recipe: RecipeModel.fromJson(recipeData),
     );
   }
 }

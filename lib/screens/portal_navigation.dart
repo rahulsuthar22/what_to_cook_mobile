@@ -1,28 +1,39 @@
 import 'package:flutter/material.dart';
 import 'dashboard_screen.dart';
 import 'recommendations_screen.dart';
+import 'reels_screen.dart';
 import 'planner_screen.dart';
 import 'grocery_screen.dart';
 import 'profile_screen.dart';
 import 'reports_screen.dart';
 import 'future_specs_screen.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import 'login_screen.dart';
 
 class PortalNavigation extends StatefulWidget {
   const PortalNavigation({super.key});
 
   @override
-  State<PortalNavigation> createState() => _PortalNavigationState();
+  State<PortalNavigation> createState() => PortalNavigationState();
 }
 
-class _PortalNavigationState extends State<PortalNavigation> {
+class PortalNavigationState extends State<PortalNavigation> {
   int _currentIndex = 0;
 
   final List<Widget> _primaryScreens = [
     const DashboardScreen(),
     const RecommendationsScreen(),
+    const ReelsScreen(),
     const PlannerScreen(),
     const GroceryScreen(),
   ];
+
+  void setTab(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,15 +43,13 @@ class _PortalNavigationState extends State<PortalNavigation> {
 
     return Scaffold(
       backgroundColor: bgColor,
-      body: _currentIndex < 4 
+      body: _currentIndex < 5 
           ? _primaryScreens[_currentIndex]
           : const MoreMenuScreen(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          setTab(index);
         },
         type: BottomNavigationBarType.fixed,
         backgroundColor: surfaceColor,
@@ -58,6 +67,11 @@ class _PortalNavigationState extends State<PortalNavigation> {
             icon: Icon(Icons.restaurant_menu_outlined),
             activeIcon: Icon(Icons.restaurant_menu),
             label: 'What to Cook',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.play_circle_outline),
+            activeIcon: Icon(Icons.play_circle_filled),
+            label: 'Reels',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_today_outlined),
@@ -85,7 +99,6 @@ class MoreMenuScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1A),
       appBar: AppBar(
@@ -124,6 +137,22 @@ class MoreMenuScreen extends StatelessWidget {
             color: Colors.amber,
             targetScreen: const FutureSpecsScreen(),
           ),
+          _buildMenuCard(
+            context,
+            title: 'Sign Out',
+            subtitle: 'Log out of your account',
+            icon: Icons.logout_outlined,
+            color: const Color(0xFFFF5A36),
+            onTap: () async {
+              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              final navigator = Navigator.of(context);
+              await authProvider.logout();
+              navigator.pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+          ),
         ],
       ),
     );
@@ -135,15 +164,20 @@ class MoreMenuScreen extends StatelessWidget {
     required String subtitle,
     required IconData icon,
     required Color color,
-    required Widget targetScreen,
+    Widget? targetScreen,
+    VoidCallback? onTap,
   }) {
     final surfaceColor = const Color(0xFF1E1E2C);
     
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => targetScreen),
-        );
+        if (onTap != null) {
+          onTap();
+        } else if (targetScreen != null) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => targetScreen),
+          );
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(16),
