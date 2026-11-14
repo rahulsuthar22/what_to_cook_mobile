@@ -5,7 +5,6 @@ import 'providers/auth_provider.dart';
 import 'providers/recipe_provider.dart';
 import 'providers/planner_provider.dart';
 import 'providers/grocery_provider.dart';
-import 'screens/login_screen.dart';
 import 'screens/portal_navigation.dart';
 
 void main() {
@@ -80,10 +79,6 @@ class AuthGate extends StatelessWidget {
       );
     }
 
-    if (auth.isAuthenticated) {
-      return const PortalNavigation();
-    }
-
-    return const LoginScreen();
+    return const PortalNavigation();
   }
 }

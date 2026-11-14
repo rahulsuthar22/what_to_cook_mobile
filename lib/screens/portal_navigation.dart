@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
-import 'dashboard_screen.dart';
-import 'recommendations_screen.dart';
-import 'reels_screen.dart';
-import 'planner_screen.dart';
-import 'grocery_screen.dart';
-import 'profile_screen.dart';
-import 'reports_screen.dart';
-import 'future_specs_screen.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import 'login_screen.dart';
+import 'discover_screen.dart';
+import 'recommendations_screen.dart';
+import 'reels_screen.dart';
+import 'future_specs_screen.dart';
 
 class PortalNavigation extends StatefulWidget {
-  const PortalNavigation({super.key});
+  final int initialTab;
+  const PortalNavigation({super.key, this.initialTab = 0});
 
   @override
   State<PortalNavigation> createState() => PortalNavigationState();
@@ -20,204 +17,166 @@ class PortalNavigation extends StatefulWidget {
 
 class PortalNavigationState extends State<PortalNavigation> {
   int _currentIndex = 0;
+  bool? _wasAuthenticated;
+  DateTime? _lastBackPressTime;
 
-  final List<Widget> _primaryScreens = [
-    const DashboardScreen(),
-    const RecommendationsScreen(),
-    const ReelsScreen(),
-    const PlannerScreen(),
-    const GroceryScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialTab;
+  }
 
   void setTab(int index) {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final maxIndex = auth.isAuthenticated ? 3 : 2;
     setState(() {
-      _currentIndex = index;
+      _currentIndex = index.clamp(0, maxIndex);
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final primaryColor = const Color(0xFFFF5A36);
-    final surfaceColor = const Color(0xFF1E1E2C);
-    final bgColor = const Color(0xFF0F0F1A);
+  /// Handles hardware back press & app back logic
+  void _handleBackPress() {
+    // 1. If not on the main Discover tab, switch back to Discover
+    if (_currentIndex != 0) {
+      setTab(0);
+      _lastBackPressTime = null; // Reset exit timer so user gets clean 2s window on Discover
+      return;
+    }
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      body: _currentIndex < 5 
-          ? _primaryScreens[_currentIndex]
-          : const MoreMenuScreen(),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setTab(index);
-        },
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: surfaceColor,
-        selectedItemColor: primaryColor,
-        unselectedItemColor: Colors.white38,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-        unselectedLabelStyle: const TextStyle(fontSize: 11),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            activeIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+    // 2. We ARE on the main Discover page (index == 0)
+    // Double press within 2 seconds to exit app
+    final now = DateTime.now();
+    if (_lastBackPressTime == null ||
+        now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+      _lastBackPressTime = now;
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.white, size: 18),
+              SizedBox(width: 10),
+              Text(
+                'Press back again to exit',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.restaurant_menu_outlined),
-            activeIcon: Icon(Icons.restaurant_menu),
-            label: 'What to Cook',
+          backgroundColor: const Color(0xFF1E1E2C),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.play_circle_outline),
-            activeIcon: Icon(Icons.play_circle_filled),
-            label: 'Reels',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            activeIcon: Icon(Icons.calendar_today),
-            label: 'Planner',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_bag_outlined),
-            activeIcon: Icon(Icons.shopping_bag),
-            label: 'Grocery',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu_outlined),
-            activeIcon: Icon(Icons.menu),
-            label: 'More',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class MoreMenuScreen extends StatelessWidget {
-  const MoreMenuScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F0F1A),
-      appBar: AppBar(
-        title: const Text('More Portal Options', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      body: GridView.count(
-        padding: const EdgeInsets.all(24),
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        children: [
-          _buildMenuCard(
-            context,
-            title: 'My Profile',
-            subtitle: 'Update details & diet preferences',
-            icon: Icons.person_outline,
-            color: Colors.blueAccent,
-            targetScreen: const ProfileScreen(),
-          ),
-          _buildMenuCard(
-            context,
-            title: 'Reports & Stats',
-            subtitle: 'Ingredient metrics & charts',
-            icon: Icons.bar_chart_outlined,
-            color: Colors.green,
-            targetScreen: const ReportsScreen(),
-          ),
-          _buildMenuCard(
-            context,
-            title: 'Future Specs',
-            subtitle: 'AI Chat, Voice, scanner sandbox',
-            icon: Icons.auto_awesome_outlined,
-            color: Colors.amber,
-            targetScreen: const FutureSpecsScreen(),
-          ),
-          _buildMenuCard(
-            context,
-            title: 'Sign Out',
-            subtitle: 'Log out of your account',
-            icon: Icons.logout_outlined,
-            color: const Color(0xFFFF5A36),
-            onTap: () async {
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
-              final navigator = Navigator.of(context);
-              await authProvider.logout();
-              navigator.pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMenuCard(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    Widget? targetScreen,
-    VoidCallback? onTap,
-  }) {
-    final surfaceColor = const Color(0xFF1E1E2C);
-    
-    return GestureDetector(
-      onTap: () {
-        if (onTap != null) {
-          onTap();
-        } else if (targetScreen != null) {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => targetScreen),
-          );
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: surfaceColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white54,
-                fontSize: 11,
-              ),
-            ),
-          ],
+      );
+      return;
+    }
+
+    // Confirmed second press within 2 seconds -> exit app cleanly
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    SystemNavigator.pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final isAuth = auth.isAuthenticated;
+
+    // Detect login/logout transition and reset to Discover tab
+    if (_wasAuthenticated != null && _wasAuthenticated != isAuth) {
+      _currentIndex = 0;
+    }
+    _wasAuthenticated = isAuth;
+
+    const primaryColor = Color(0xFFFF5A36);
+    const surfaceColor = Color(0xFF1E1E2C);
+    const bgColor = Color(0xFF0F0F1A);
+
+    // Dynamic screen list:
+    // Non-login (Guest): 3 tabs -> Discover, What to Cook, Reels
+    // Logged in: 4 tabs -> Discover, What to Cook, Reels, AI Chef
+    final List<Widget> screens = isAuth
+        ? const [
+            DiscoverScreen(),
+            RecommendationsScreen(),
+            ReelsScreen(),
+            FutureSpecsScreen(),
+          ]
+        : const [
+            DiscoverScreen(),
+            RecommendationsScreen(),
+            ReelsScreen(),
+          ];
+
+    final int safeIndex = _currentIndex.clamp(0, screens.length - 1);
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        if (didPop) return;
+        _handleBackPress();
+      },
+      child: Scaffold(
+        backgroundColor: bgColor,
+        body: screens[safeIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: safeIndex,
+          onTap: (index) {
+            setTab(index);
+          },
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: surfaceColor,
+          selectedItemColor: primaryColor,
+          unselectedItemColor: Colors.white38,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+          unselectedLabelStyle: const TextStyle(fontSize: 11),
+          items: isAuth
+              ? const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.explore_outlined),
+                    activeIcon: Icon(Icons.explore),
+                    label: 'Discover',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.restaurant_menu_outlined),
+                    activeIcon: Icon(Icons.restaurant_menu),
+                    label: 'What to Cook',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.play_circle_outline),
+                    activeIcon: Icon(Icons.play_circle_filled),
+                    label: 'Reels',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.smart_toy_outlined),
+                    activeIcon: Icon(Icons.smart_toy),
+                    label: 'AI Chef',
+                  ),
+                ]
+              : const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.explore_outlined),
+                    activeIcon: Icon(Icons.explore),
+                    label: 'Discover',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.restaurant_menu_outlined),
+                    activeIcon: Icon(Icons.restaurant_menu),
+                    label: 'What to Cook',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.play_circle_outline),
+                    activeIcon: Icon(Icons.play_circle_filled),
+                    label: 'Reels',
+                  ),
+                ],
         ),
       ),
     );

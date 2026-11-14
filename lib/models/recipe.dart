@@ -68,6 +68,14 @@ class RecipeModel {
         ?.map((m) => m.toString())
         .toList();
 
+    if (parsedMissing == null && json['ingredients_details'] is List) {
+      final details = json['ingredients_details'] as List;
+      parsedMissing = details
+          .where((d) => d is Map && d['matched'] == false)
+          .map((d) => d['name'].toString())
+          .toList();
+    }
+
     return RecipeModel(
       recipeId: _intFromJson(json['recipe_id'] ?? json['recipeId']),
       recipeName: json['recipe_name'] ?? json['recipeName'] ?? '',
@@ -86,8 +94,12 @@ class RecipeModel {
       matchPercentage: json['match_percentage'] != null 
           ? double.tryParse(json['match_percentage'].toString()) 
           : null,
-      matchedCount: json['matched_count'] != null ? _intFromJson(json['matched_count']) : null,
-      totalCount: json['total_count'] != null ? _intFromJson(json['total_count']) : null,
+      matchedCount: json['matched_count'] != null
+          ? _intFromJson(json['matched_count'])
+          : (json['matched_ingredients_count'] != null ? _intFromJson(json['matched_ingredients_count']) : null),
+      totalCount: json['total_count'] != null
+          ? _intFromJson(json['total_count'])
+          : (json['total_ingredients_needed'] != null ? _intFromJson(json['total_ingredients_needed']) : null),
       missingIngredients: parsedMissing,
       ingredients: parsedIngredients,
     );

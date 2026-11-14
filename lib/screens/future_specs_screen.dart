@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'portal_navigation.dart';
 
 class FutureSpecsScreen extends StatefulWidget {
   const FutureSpecsScreen({super.key});
@@ -114,12 +115,19 @@ class _FutureSpecsScreenState extends State<FutureSpecsScreen> with SingleTicker
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1A),
       appBar: AppBar(
-        title: const Text('Future Specifications', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('AI Chef & Smart Tools', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              final navState = context.findAncestorStateOfType<PortalNavigationState>();
+              navState?.setTab(0);
+            }
+          },
         ),
         bottom: TabBar(
           controller: _tabController,

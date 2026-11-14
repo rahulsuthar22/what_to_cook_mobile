@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/grocery_provider.dart';
+import 'portal_navigation.dart';
 
 class GroceryScreen extends StatefulWidget {
   const GroceryScreen({super.key});
@@ -121,6 +122,17 @@ class _GroceryScreenState extends State<GroceryScreen> {
         elevation: 0,
         centerTitle: true,
         toolbarHeight: 56,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              final navState = context.findAncestorStateOfType<PortalNavigationState>();
+              navState?.setTab(0);
+            }
+          },
+        ),
         actions: [
           if (grocery.groceryItems.isNotEmpty)
             IconButton(

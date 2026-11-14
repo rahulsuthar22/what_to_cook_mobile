@@ -9,6 +9,7 @@ import '../models/recipe.dart';
 import '../providers/recipe_provider.dart';
 import '../providers/planner_provider.dart';
 import 'recipe_detail_screen.dart';
+import 'portal_navigation.dart';
 
 class ReelsScreen extends StatefulWidget {
   const ReelsScreen({super.key});
@@ -547,6 +548,36 @@ class _ReelPlayerCardState extends State<ReelPlayerCard> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 stops: [0.0, 0.2, 0.7, 1.0],
+              ),
+            ),
+          ),
+
+          // Top Left Floating Back Button (navigate to Discover)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 10,
+            left: 14,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: () {
+                final navState = context.findAncestorStateOfType<PortalNavigationState>();
+                if (navState != null) {
+                  navState.setTab(0);
+                } else if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                ),
+                child: const Icon(
+                  Icons.arrow_back,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
           ),

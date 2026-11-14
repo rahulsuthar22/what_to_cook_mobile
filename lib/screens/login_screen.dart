@@ -40,9 +40,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (mounted) {
       if (result['success'] == true) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const PortalNavigation()),
-        );
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const PortalNavigation()),
+          );
+        }
       } else {
         setState(() {
           _errorMessage = result['error'] ?? 'Authentication failed';
@@ -70,6 +74,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (Navigator.of(context).canPop())
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ),
                   // Logo
                   Icon(
                     Icons.restaurant_menu,
@@ -260,9 +272,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             final res = await authProvider.loginWithGoogleNative();
                             if (mounted) {
                               if (res['success'] == true) {
-                                navigator.pushReplacement(
-                                  MaterialPageRoute(builder: (_) => const PortalNavigation()),
-                                );
+                                if (navigator.canPop()) {
+                                  navigator.pop();
+                                } else {
+                                  navigator.pushReplacement(
+                                    MaterialPageRoute(builder: (_) => const PortalNavigation()),
+                                  );
+                                }
                               } else {
                                 setState(() {
                                   _errorMessage = res['error'] ?? 'Google authentication failed';
